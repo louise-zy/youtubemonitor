@@ -1,0 +1,53 @@
+name: YouTube RSS Monitor
+
+on:
+  schedule:
+    - cron: '0 */4 * * *'  # 每4小时运行一次
+  workflow_dispatch:  # 允许手动触发
+
+permissions:
+  contents: write
+
+jobs:
+  run-monitor:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+        
+    - name: Install system dependencies
+      run: sudo apt-get install -y ffmpeg
+
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+        
+    - name: Run Monitor
+      env:
+        DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        DINGTALK_WEBHOOK: ${{ secrets.DINGTALK_WEBHOOK }}
+        DINGTALK_SECRET: ${{ secrets.DINGTALK_SECRET }}
+        AI_BASE_URL: ${{ secrets.AI_BASE_URL }}
+        AI_MODEL: ${{ secrets.AI_MODEL }}
+      run: python youtube_rss_monitor.py
+      
+    - name: Commit and push database changes
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        # 强制添加数据库文件（即使在gitignore中）
+        git add -f *.db
+        # 检查是否有变更
+        if git diff --staged --quiet; then
+          echo "No changes to commit"
+        else
+          git commit -m "Update database state [skip ci]"
+          git push
+        fi

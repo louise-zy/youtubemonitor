@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.venv/
+.env
+youtube_rss_monitor.log
+# *.db
+youtube_rss_updates_*.txt

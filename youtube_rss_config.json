@@ -1,0 +1,85 @@
+{
+  "deepseek_api_key": "sk-f0da4ec56a0344d299f15d078ea811af",
+  "ai_base_url": "https://api.deepseek.com",
+  "ai_model": "deepseek-chat",
+  "check_interval_hours": 6,
+  "max_videos_per_check": 1,
+  "subtitle_languages": ["zh", "en"],
+  "enable_subtitle_extraction": true,
+  "subtitle_retry_delay": 10,
+  "subtitle_request_delay": 5,
+  "subtitle_options": {
+    "enabled": true,
+    "languages": ["zh", "en"],
+    "allow_automatic_subtitles": true,
+    "prefer_manual_subtitles": true,
+    "max_retries": 3,
+    "retry_wait_seconds": 5,
+    "request_timeout": 30,
+    "cookie_file": "",
+    "proxy": "",
+    "use_transcript_api": true,
+    "transcript_api_preferred_languages": ["zh", "en"],
+    "transcript_api_auto_translate_to": "zh"
+  },
+  "ai_options": {
+    "enable_chunking": true,
+    "chunk_char_limit": 5000,
+    "chunk_overlap": 400,
+    "max_chunks": 6,
+    "chunk_summary_max_tokens": 600,
+    "final_summary_max_tokens": 1000,
+    "temperature": 0.7
+  },
+  "dingtalk": {
+    "enabled": true,
+    "webhook_url": "https://oapi.dingtalk.com/robot/send?access_token=7a89536c49f4eaeb95f770a8cc50ba3da772fbc5dbf666f092ac9ca126ebaef1",
+    "secret": "",
+    "at_all": false,
+    "at_mobiles": []
+  },
+  "channels": [
+    {
+      "name": "Steve Eisman",
+      "channel_url": "https://www.youtube.com/@RealEismanPlaybook",
+      "channel_id": "",
+      "description": "Steve Eisman"
+    },
+    {
+      "name": "Patrick Boyle",
+      "channel_url": "https://www.youtube.com/@PBoyle",
+      "channel_id": "",
+      "description": "Patrick Boyle"
+    },
+    {
+      "name": "Andrei Jikh",
+      "channel_url": "https://www.youtube.com/@AndreiJikh",
+      "channel_id": "",
+      "description": "Andrei Jikh"
+    },
+    {
+      "name": "Johnny Harris",
+      "channel_url": "https://www.youtube.com/@johnnyharris",
+      "channel_id": "",
+      "description": "Johnny Harris"
+    },
+    {
+      "name": "Tom Bilyeu",
+      "channel_url": "https://www.youtube.com/@TomBilyeu",
+      "channel_id": "",
+      "description": "Tom Bilyeu"
+    },
+    {
+      "name": "硅谷101",
+      "channel_url": "https://www.youtube.com/@valley101podcast",
+      "channel_id": "",
+      "description": "硅谷101"
+    },
+    {
+      "name": "Money or Life",
+      "channel_url": "https://www.youtube.com/@Money_or_Life",
+      "channel_id": "",
+      "description": "Money or Life"
+    }
+  ]
+}

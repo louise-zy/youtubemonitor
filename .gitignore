@@ -1,7 +1,29 @@
+# Ignore virtual env
+.venv/
+venv/
 __pycache__/
 *.pyc
-.venv/
-.env
-youtube_rss_monitor.log
-# *.db
-youtube_rss_updates_*.txt
+*.pyo
+*.pyd
+.Python
+env/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.git
+.mypy_cache
+.pytest_cache
+.hypothesiss
+
+# Ignore sensitive info
+*.db
+!youtube_rss.db
+youtube_rss_config.json
+www.youtube.com_cookies.txt

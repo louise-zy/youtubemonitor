@@ -1,0 +1,52 @@
+{
+  "ai_summary": {
+    "api_key": "",
+    "base_url": "https://api.deepseek.com",
+    "model": "deepseek-chat",
+    "enable_chunking": true,
+    "chunk_char_limit": 5000,
+    "chunk_overlap": 400,
+    "max_chunks": 6,
+    "chunk_summary_max_tokens": 600,
+    "final_summary_max_tokens": 1000,
+    "temperature": 0.7
+  },
+  "subtitle_options": {
+    "enabled": true,
+    "languages": ["zh", "en"],
+    "allow_automatic_subtitles": true,
+    "prefer_manual_subtitles": true,
+    "max_retries": 3,
+    "retry_wait_seconds": 5,
+    "request_timeout": 30,
+    "cookie_file": "www.youtube.com_cookies.txt",
+    "browser_cookies": "",
+    "proxy": "",
+    "use_transcript_api": true,
+    "transcript_api_preferred_languages": ["zh", "en"],
+    "transcript_api_auto_translate_to": "zh"
+  },
+  "dingtalk": {
+    "enabled": true,
+    "webhook_url": "",
+    "secret": "",
+    "at_all": false,
+    "at_mobiles": []
+  },
+  "monitor_settings": {
+    "check_interval_seconds": 21600,
+    "max_videos_per_check": 5
+  },
+  "channels": [
+    {
+      "name": "Steve Eisman",
+      "url": "https://www.youtube.com/@RealEismanPlaybook",
+      "description": "Steve Eisman"
+    },
+    {
+      "name": "Patrick Boyle",
+      "url": "https://www.youtube.com/@PBoyle",
+      "description": "Patrick Boyle"
+    }
+  ]
+}

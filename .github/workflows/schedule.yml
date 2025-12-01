@@ -2,8 +2,8 @@ name: YouTube RSS Monitor
 
 on:
   schedule:
-    - cron: '0 */4 * * *'  # 每4小时运行一次
-  workflow_dispatch:  # 允许手动触发
+    - cron: '0 */6 * * *'  # Run every 6 hours
+  workflow_dispatch:  # Allow manual trigger
 
 permissions:
   contents: write
@@ -22,29 +22,41 @@ jobs:
         python-version: '3.10'
         
     - name: Install system dependencies
-      run: sudo apt-get install -y ffmpeg
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y ffmpeg
+        # Create dummy cookie file if needed (empty) to avoid errors if code checks for existence
+        touch www.youtube.com_cookies.txt
 
     - name: Install Python dependencies
       run: |
         python -m pip install --upgrade pip
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
         
-    - name: Run Monitor
+    - name: Setup Config
+      run: |
+        if [ -f youtube_rss_config.sample.json ]; then
+          cp youtube_rss_config.sample.json youtube_rss_config.json
+        else
+          echo "Warning: youtube_rss_config.sample.json not found"
+        fi
+
+    - name: Run Monitor (Once)
       env:
         DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
         DINGTALK_WEBHOOK: ${{ secrets.DINGTALK_WEBHOOK }}
         DINGTALK_SECRET: ${{ secrets.DINGTALK_SECRET }}
-        AI_BASE_URL: ${{ secrets.AI_BASE_URL }}
-        AI_MODEL: ${{ secrets.AI_MODEL }}
-      run: python youtube_rss_monitor.py
+        # Using secrets to populate config values
+      run: python youtube_rss_monitor.py --once
       
     - name: Commit and push database changes
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
-        # 强制添加数据库文件（即使在gitignore中）
-        git add -f *.db
-        # 检查是否有变更
+        # Force add the database file (it might be ignored or new)
+        # Note: Using youtube_rss.db as defined in default config
+        git add -f youtube_rss.db
+        # Check if there are changes
         if git diff --staged --quiet; then
           echo "No changes to commit"
         else

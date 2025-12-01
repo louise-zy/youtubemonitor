@@ -4,6 +4,15 @@ on:
   schedule:
     - cron: '0 */6 * * *'  # Run every 6 hours
   workflow_dispatch:  # Allow manual trigger
+    inputs:
+      run_mode:
+        description: 'Run Mode (normal/test)'
+        required: false
+        default: 'normal'
+        type: choice
+        options:
+        - normal
+        - test
 
 permissions:
   contents: write
@@ -41,13 +50,20 @@ jobs:
           echo "Warning: youtube_rss_config.sample.json not found"
         fi
 
-    - name: Run Monitor (Once)
+    - name: Run Monitor
       env:
         DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
         DINGTALK_WEBHOOK: ${{ secrets.DINGTALK_WEBHOOK }}
         DINGTALK_SECRET: ${{ secrets.DINGTALK_SECRET }}
         # Using secrets to populate config values
-      run: python youtube_rss_monitor.py --once
+      run: |
+        if [ "${{ github.event.inputs.run_mode }}" == "test" ]; then
+          echo "Running in TEST mode..."
+          python youtube_rss_monitor.py --test
+        else
+          echo "Running in NORMAL mode..."
+          python youtube_rss_monitor.py --once
+        fi
       
     - name: Commit and push database changes
       run: |

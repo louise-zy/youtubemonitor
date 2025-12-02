@@ -1,5 +1,6 @@
 import logging
 import openai
+import httpx
 from typing import Optional, Dict, List
 
 class AIContentProcessor:
@@ -11,10 +12,20 @@ class AIContentProcessor:
         base_url: str = "https://api.deepseek.com",
         model: str = "deepseek-chat",
         options: Optional[Dict] = None,
+        proxy: Optional[str] = None,
     ):
         self.client = None
         try:
-            self.client = openai.OpenAI(api_key=api_key, base_url=base_url)
+            http_client = None
+            if proxy:
+                logging.info(f"AI处理器已启用代理: {proxy}")
+                http_client = httpx.Client(proxies=proxy)
+                
+            self.client = openai.OpenAI(
+                api_key=api_key, 
+                base_url=base_url,
+                http_client=http_client
+            )
         except Exception as e:
             logging.warning(f"OpenAI客户端初始化失败: {e}")
             

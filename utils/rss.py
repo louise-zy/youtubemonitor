@@ -8,11 +8,17 @@ from utils.models import VideoInfo
 class YouTubeRSSParser:
     """YouTube RSS解析器"""
     
-    def __init__(self):
+    def __init__(self, proxy: Optional[str] = None):
         self.session = requests.Session()
         self.session.headers.update({
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         })
+        if proxy:
+            self.session.proxies.update({
+                'http': proxy,
+                'https': proxy
+            })
+            logging.info(f"RSS解析器已启用代理: {proxy}")
     
     def get_channel_id_from_url(self, channel_url: str) -> Optional[str]:
         """从频道URL提取频道ID"""

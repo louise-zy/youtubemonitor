@@ -34,18 +34,37 @@ class YouTubeMonitor:
     
     def __init__(self, config_path: str = "youtube_rss_config.json"):
         self.config = self._load_config(config_path)
+        
+        # 确定代理设置 (优先级: 环境变量 > 配置文件 > 无)
+        self.proxy = os.environ.get("HTTP_PROXY") or self.config.get("proxy")
+        
+        # 如果检测到在 GitHub Actions 环境中运行，且没有显式通过环境变量指定代理，则忽略配置文件的代理
+        if os.environ.get("GITHUB_ACTIONS") == "true" and not os.environ.get("HTTP_PROXY"):
+            if self.proxy:
+                logging.info("检测到 GitHub Actions 环境，忽略配置文件中的本地代理设置")
+                self.proxy = None
+
+        if self.proxy:
+            logging.info(f"使用全局代理: {self.proxy}")
+
         self.db_manager = DBManager(self.config.get("db_path", "youtube_rss.db"))
-        self.rss_parser = YouTubeRSSParser()
+        self.rss_parser = YouTubeRSSParser(proxy=self.proxy)
         
         # 初始化各个组件
-        self.transcript_extractor = TranscriptExtractor(self.config.get("subtitle_options"))
+        # 确保 subtitle_options 中也使用统一的 proxy
+        sub_opts = self.config.get("subtitle_options") or {}
+        if not sub_opts.get("proxy") and self.proxy:
+            sub_opts["proxy"] = self.proxy
+            
+        self.transcript_extractor = TranscriptExtractor(sub_opts)
         
         ai_config = self.config.get("ai_summary", {})
         self.ai_processor = AIContentProcessor(
             api_key=ai_config.get("api_key", ""),
             base_url=ai_config.get("base_url", "https://api.deepseek.com"),
             model=ai_config.get("model", "deepseek-chat"),
-            options=ai_config
+            options=ai_config,
+            proxy=self.proxy
         )
         
         ding_config = self.config.get("dingtalk", {})

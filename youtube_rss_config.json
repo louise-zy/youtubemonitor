@@ -1,4 +1,5 @@
 {
+  "proxy": "http://127.0.0.1:8001",
   "ai_summary": {
     "api_key": "sk-f0da4ec56a0344d299f15d078ea811af",
     "base_url": "https://api.deepseek.com",

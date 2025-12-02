@@ -74,33 +74,46 @@ class TranscriptExtractor:
     def extract_transcript(self, video_id: str, languages: Optional[List[str]] = None) -> str:
         """提取视频字幕"""
         preferred_langs = self._expand_langs(languages or self.languages)
+        logging.info(f"准备提取字幕: {video_id}, 偏好语言: {preferred_langs}")
 
         if not self.enabled:
+            logging.info("字幕提取功能未启用")
             return ""
 
         tracks_sources: List[Dict[str, List[Dict]]] = []
         if YT_DLP_AVAILABLE:
             logging.info(f"尝试使用 yt-dlp 获取字幕: {video_id}")
-            info = self._fetch_metadata_with_yt_dlp(video_id, preferred_langs)
-            if info:
-                manual_tracks = info.get("subtitles") or {}
-                auto_tracks = info.get("automatic_captions") or {}
-                if manual_tracks and self.prefer_manual:
-                    tracks_sources.append(manual_tracks)
-                if auto_tracks and self.allow_auto:
-                    tracks_sources.append(auto_tracks)
-                if not tracks_sources and manual_tracks:
-                    tracks_sources.append(manual_tracks)
-                if not tracks_sources and auto_tracks:
-                    tracks_sources.append(auto_tracks)
-            else:
-                logging.warning(f"yt-dlp 未能获取到元数据: {video_id}")
+            try:
+                info = self._fetch_metadata_with_yt_dlp(video_id, preferred_langs)
+                if info:
+                    manual_tracks = info.get("subtitles") or {}
+                    auto_tracks = info.get("automatic_captions") or {}
+                    
+                    logging.info(f"yt-dlp 获取到元数据: 手动字幕={list(manual_tracks.keys())}, 自动字幕={list(auto_tracks.keys())}")
+                    
+                    if manual_tracks and self.prefer_manual:
+                        tracks_sources.append(manual_tracks)
+                    if auto_tracks and self.allow_auto:
+                        tracks_sources.append(auto_tracks)
+                    if not tracks_sources and manual_tracks:
+                        tracks_sources.append(manual_tracks)
+                    if not tracks_sources and auto_tracks:
+                        tracks_sources.append(auto_tracks)
+                else:
+                    logging.warning(f"yt-dlp 未能获取到元数据: {video_id}")
+            except Exception as e:
+                logging.error(f"yt-dlp 尝试过程中发生异常: {e}")
+        else:
+            logging.warning("yt-dlp 库不可用")
 
-        for tracks in tracks_sources:
+        for i, tracks in enumerate(tracks_sources):
+            logging.info(f"尝试从第 {i+1} 个字幕源提取...")
             text = self._extract_from_tracks(tracks, preferred_langs)
             if text:
                 logging.info(f"yt-dlp 成功提取字幕，长度: {len(text)}")
                 return text
+            else:
+                logging.info(f"第 {i+1} 个字幕源未匹配到有效内容")
 
         logging.info(f"yt-dlp 提取失败或无字幕，尝试 fallback 方案: {video_id}")
         return self._fallback_transcript_api(video_id, preferred_langs)

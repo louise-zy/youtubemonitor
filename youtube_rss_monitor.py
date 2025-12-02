@@ -77,9 +77,6 @@ class YouTubeMonitor:
             # AI配置
             if os.environ.get("OPENAI_API_KEY"):
                 config.setdefault("ai_summary", {})["api_key"] = os.environ["OPENAI_API_KEY"]
-            elif os.environ.get("DEEPSEEK_API_KEY"):
-                config.setdefault("ai_summary", {})["api_key"] = os.environ["DEEPSEEK_API_KEY"]
-                
             if os.environ.get("OPENAI_API_BASE"):
                 config["ai_summary"]["base_url"] = os.environ["OPENAI_API_BASE"]
                 
@@ -149,18 +146,11 @@ class YouTubeMonitor:
         logging.info(f"成功添加频道: {name}")
         return True
 
-    def run_once(self, force_test: bool = False):
+    def run_once(self):
         """执行一次完整的检查流程"""
         channels = self.db_manager.get_all_channels()
         logging.info(f"开始检查 {len(channels)} 个频道...")
         
-        if force_test:
-            logging.info(">>> 测试模式: 强制处理每个频道的最新视频，忽略历史记录 <<<")
-            for channel in channels:
-                self._process_channel_test_mode(channel)
-            logging.info("测试模式执行完成")
-            return
-
         is_first_run = self.db_manager.is_first_run()
         if is_first_run:
             logging.info("检测到首次运行，仅标记最新视频，不进行推送")
@@ -169,25 +159,6 @@ class YouTubeMonitor:
             self._process_channel(channel, is_first_run)
             
         logging.info("检查完成")
-
-    def _process_channel_test_mode(self, channel: YouTubeChannel):
-        """测试模式：强制处理频道的最新一个视频"""
-        logging.info(f"正在检查频道(测试模式): {channel.name}")
-        try:
-            videos = self.rss_parser.parse_rss_feed(channel.rss_url)
-            if not videos:
-                logging.warning(f"频道 {channel.name} 未获取到视频列表")
-                return
-
-            # 按发布时间排序（新到旧）并只取第一个
-            videos.sort(key=lambda v: v.published_at, reverse=True)
-            latest_video = videos[0]
-            
-            logging.info(f"测试模式 - 强制处理视频: {latest_video.title}")
-            self._process_single_video(channel, latest_video, is_test=True)
-            
-        except Exception as e:
-            logging.error(f"处理频道 {channel.name} 失败: {e}")
 
     def _process_channel(self, channel: YouTubeChannel, is_first_run: bool):
         """处理单个频道"""
@@ -206,6 +177,7 @@ class YouTubeMonitor:
             if is_first_run:
                 if videos:
                     latest = videos[0]
+                    logging.info(f"首次运行，初始化频道 {channel.name} 基准视频: {latest.title} ({latest.published_at})")
                     self.db_manager.save_video(latest)
                     channel.last_video_id = latest.video_id
                     channel.last_update = latest.published_at
@@ -215,77 +187,156 @@ class YouTubeMonitor:
 
             # 获取上次处理的最新视频时间
             last_published_at = self.db_manager.get_latest_video_published_at_for_channel(channel.name)
+            logging.info(f"频道 {channel.name} 上次更新时间: {last_published_at}")
             
             new_videos = []
             for video in videos:
                 # 简单的去重检查
                 if self.db_manager.video_exists(video.video_id):
+                    # logging.debug(f"视频 {video.video_id} 已存在于数据库，跳过")
                     continue
                 
                 # 必须晚于上次记录的时间
-                if last_published_at and video.published_at <= last_published_at:
-                    continue
+                if last_published_at:
+                    # 比较时间字符串
+                    if video.published_at <= last_published_at:
+                        # logging.debug(f"视频 {video.video_id} ({video.published_at}) 早于上次更新时间，跳过")
+                        continue
+                    else:
+                        logging.info(f"发现新视频: {video.title} ({video.published_at}) > {last_published_at}")
+                else:
+                    logging.info(f"发现新视频(无历史记录): {video.title} ({video.published_at})")
                     
                 new_videos.append(video)
             
-            if not new_videos:
-                logging.info(f"频道 {channel.name} 没有新视频")
-                return
-                
-            logging.info(f"发现 {len(new_videos)} 个新视频")
-            
-            # 处理新视频
             # 限制每次处理的数量
-            for video in new_videos[:self.max_videos]:
-                self._process_single_video(channel, video)
-
-            # 更新频道状态
-            channel.last_check = datetime.now().isoformat()
-            self.db_manager.save_channel(channel)
+            new_videos = new_videos[:self.max_videos]
             
-        except Exception as e:
-            logging.error(f"处理频道 {channel.name} 失败: {e}")
+            if new_videos:
+                logging.info(f"频道 {channel.name} 准备处理 {len(new_videos)} 个新视频")
+                
+                # 按发布时间正序处理（旧到新），符合人类阅读习惯
+                for video in reversed(new_videos):
+                    try:
+                        success = self._process_video(video)
+                        if success:
+                            # 更新频道状态
+                            channel.last_video_id = video.video_id
+                            channel.last_update = video.published_at
+                            channel.last_check = datetime.now().isoformat()
+                            self.db_manager.save_channel(channel)
+                            logging.info(f"频道状态已更新: last_update={channel.last_update}")
+                        else:
+                            logging.warning(f"视频 {video.video_id} 处理失败，暂不更新频道最后时间戳(除非是致命错误)")
+                            # 注意：如果这里不更新时间戳，下次还会再试。
+                            # 如果是永久性错误（如无法提取字幕），_process_video 应该返回 True 但标记视频为已处理（即便内容不完整）。
+                            # 只有在临时性错误（如网络断开）时才返回 False。
+                            # 目前 _process_video 逻辑修改为：只要不是程序崩溃，都视为“处理完成”（哪怕是失败的处理），以免卡死。
+                            
+                            # 修正策略：只要处理过（无论成功失败），都应该推进指针，避免死循环。
+                            # 除非我们实现了精细的重试队列。
+                            # 这里我们选择：如果处理失败，记录日志，但仍然更新时间戳，防止死循环卡住后续视频。
+                            logging.warning(f"为了防止死循环，跳过失败视频 {video.video_id}，更新时间戳")
+                            channel.last_video_id = video.video_id
+                            channel.last_update = video.published_at
+                            channel.last_check = datetime.now().isoformat()
+                            self.db_manager.save_channel(channel)
 
-    def _process_single_video(self, channel: YouTubeChannel, video: VideoInfo, is_test: bool = False):
-        """处理单个视频的核心逻辑"""
-        logging.info(f"开始处理视频: {video.title}")
-        
-        # 1. 获取字幕
-        transcript = self.transcript_extractor.extract_transcript(video.video_id, video.video_url)
-        if not transcript:
-            logging.warning(f"视频 {video.title} 未能提取到字幕，跳过摘要生成")
-            if not is_test: # 测试模式下即使没有字幕也尝试发送（虽然摘要为空）
-                return
-        
-        video.transcript = transcript
-        
-        # 2. 生成AI摘要
-        logging.info("正在生成AI摘要...")
-        ai_result = self.ai_processor.generate_summary_and_outline(video.title, transcript)
-        video.summary = ai_result.get("summary", "")
-        video.outline = ai_result.get("outline", "")
-        
-        # 3. 推送钉钉
-        if self.ding_enabled:
-            logging.info("正在推送钉钉消息...")
-            title_prefix = "[测试] " if is_test else ""
-            success = self.ding_client.send_message(
-                title=f"{title_prefix}{video.title}",
-                text=f"## {title_prefix}{video.title}\n\n**发布时间**: {video.published_at}\n\n**频道**: {channel.name}\n\n**视频链接**: {video.video_url}\n\n### AI 摘要\n{video.summary}\n\n### 内容大纲\n{video.outline}",
-                pic_url=f"https://img.youtube.com/vi/{video.video_id}/maxresdefault.jpg"
-            )
-            if success:
-                logging.info("钉钉推送成功")
+                    except Exception as video_e:
+                        logging.error(f"处理视频 {video.video_id} 时发生未捕获异常: {video_e}", exc_info=True)
+                        # 同样防止死循环
+                        channel.last_video_id = video.video_id
+                        channel.last_update = video.published_at
+                        self.db_manager.save_channel(channel)
             else:
-                logging.error("钉钉推送失败")
+                logging.info(f"频道 {channel.name} 无新视频")
+                
+        except Exception as e:
+            logging.error(f"处理频道 {channel.name} 出错: {e}", exc_info=True)
+
+    def _process_video(self, video: VideoInfo) -> bool:
+        """
+        处理单个视频：字幕 -> 摘要 -> 推送
+        返回: True 表示处理完成（无论成功失败，只要不再重试），False 表示需要重试
+        """
+        logging.info(f"开始处理视频: {video.title} ({video.video_id})")
         
-        # 4. 保存到数据库 (测试模式不保存，以免影响正常流程判定)
-        if not is_test:
-            self.db_manager.save_video(video)
-            # 更新频道最新视频ID
-            channel.last_video_id = video.video_id
-            channel.last_update = video.published_at
-            self.db_manager.save_channel(channel)
+        try:
+            # 1. 提取字幕
+            try:
+                transcript = self.transcript_extractor.extract_transcript(video.video_id)
+                video.transcript = transcript
+            except Exception as e:
+                logging.error(f"提取字幕异常: {e}")
+                video.transcript = ""
+
+            if not video.transcript:
+                logging.warning(f"视频 {video.video_id} 未能提取到字幕，跳过摘要生成")
+                video.summary = "未能提取到字幕，无法生成摘要"
+                video.outline = ""
+            else:
+                # 2. 生成摘要
+                logging.info("正在生成AI摘要...")
+                try:
+                    ai_result = self.ai_processor.generate_summary_and_outline(video.title, video.transcript)
+                    video.summary = ai_result.get("summary", "")
+                    video.outline = ai_result.get("outline", "")
+                except Exception as ai_e:
+                    logging.error(f"AI摘要生成失败: {ai_e}")
+                    video.summary = f"摘要生成失败: {ai_e}"
+                    video.outline = ""
+            
+            # 3. 保存到数据库 (无论前面成功与否，都保存，防止重复处理)
+            try:
+                self.db_manager.save_video(video)
+                logging.info(f"视频 {video.video_id} 已保存到数据库")
+            except Exception as db_e:
+                logging.error(f"保存视频到数据库失败: {db_e}")
+                # 数据库存不进去是严重错误，可能需要重试
+                return False
+            
+            # 4. 推送钉钉
+            if self.ding_enabled:
+                try:
+                    self._send_notification(video)
+                    logging.info(f"视频 {video.video_id} 推送成功")
+                except Exception as ding_e:
+                    logging.error(f"推送钉钉失败: {ding_e}")
+                    # 推送失败不影响“已处理”状态
+            
+            return True
+
+        except Exception as e:
+            logging.error(f"处理视频流程发生未知错误: {e}", exc_info=True)
+            return True # 即使未知错误，也标记为处理过，防止死循环
+
+
+    def _send_notification(self, video: VideoInfo):
+        """发送钉钉通知"""
+        title = f"📺 新视频发布：{video.channel_name}"
+        
+        # 构建Markdown消息
+        text = f"### {video.title}\n\n"
+        text += f"**频道**：{video.channel_name}\n"
+        text += f"**发布时间**：{video.published_at}\n"
+        text += f"**视频链接**：[点击观看]({video.video_url})\n\n"
+        
+        if video.summary:
+            text += f"#### 📝 AI 摘要\n{video.summary}\n\n"
+        
+        if video.outline and video.outline != "未能生成结构化大纲":
+            text += f"#### 📌 内容大纲\n{video.outline}\n"
+            
+        # 发送
+        ding_config = self.config.get("dingtalk", {})
+        at_all = ding_config.get("at_all", False)
+        at_mobiles = ding_config.get("at_mobiles", [])
+        
+        # 长度截断保护 (钉钉限制约20000字节)
+        if len(text) > 15000:
+            text = text[:15000] + "\n...(内容过长已截断)"
+            
+        self.ding_client.send_markdown(title, text, at_all=at_all, at_mobiles=at_mobiles)
 
     def run_loop(self):
         """持续运行模式"""
@@ -307,7 +358,6 @@ def main():
     parser.add_argument("-c", "--config", default="youtube_rss_config.json", help="配置文件路径")
     parser.add_argument("--add-channel", nargs=2, metavar=('NAME', 'URL'), help="添加新频道: --add-channel \"Name\" \"URL\"")
     parser.add_argument("--once", action="store_true", help="仅运行一次检查")
-    parser.add_argument("--test", action="store_true", help="测试模式：强制处理每个频道的最新视频，不保存状态")
     
     args = parser.parse_args()
     
@@ -318,8 +368,8 @@ def main():
         monitor.add_channel_from_url(name, url)
         return
         
-    if args.once or args.test:
-        monitor.run_once(force_test=args.test)
+    if args.once:
+        monitor.run_once()
     else:
         monitor.run_loop()
 

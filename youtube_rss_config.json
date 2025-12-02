@@ -1,6 +1,6 @@
 {
   "ai_summary": {
-    "api_key": "",
+    "api_key": "sk-f0da4ec56a0344d299f15d078ea811af",
     "base_url": "https://api.deepseek.com",
     "model": "deepseek-chat",
     "enable_chunking": true,
@@ -28,7 +28,7 @@
   },
   "dingtalk": {
     "enabled": true,
-    "webhook_url": "",
+    "webhook_url": "https://oapi.dingtalk.com/robot/send?access_token=7a89536c49f4eaeb95f770a8cc50ba3da772fbc5dbf666f092ac9ca126ebaef1",
     "secret": "",
     "at_all": false,
     "at_mobiles": []
@@ -47,6 +47,31 @@
       "name": "Patrick Boyle",
       "url": "https://www.youtube.com/@PBoyle",
       "description": "Patrick Boyle"
+    },
+    {
+      "name": "Andrei Jikh",
+      "url": "https://www.youtube.com/@AndreiJikh",
+      "description": "Andrei Jikh"
+    },
+    {
+      "name": "Johnny Harris",
+      "url": "https://www.youtube.com/@johnnyharris",
+      "description": "Johnny Harris"
+    },
+    {
+      "name": "Tom Bilyeu",
+      "url": "https://www.youtube.com/@TomBilyeu",
+      "description": "Tom Bilyeu"
+    },
+    {
+      "name": "硅谷101",
+      "url": "https://www.youtube.com/@valley101podcast",
+      "description": "硅谷101"
+    },
+    {
+      "name": "Money or Life",
+      "url": "https://www.youtube.com/@Money_or_Life",
+      "description": "Money or Life"
     }
   ]
 }

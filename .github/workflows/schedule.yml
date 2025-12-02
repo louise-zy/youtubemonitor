@@ -1,81 +1,52 @@
-name: YouTube RSS Monitor
+name: Daily YouTube RSS Monitor
 
 on:
   schedule:
-    - cron: '0 */6 * * *'  # Run every 6 hours
-  workflow_dispatch:  # Allow manual trigger
-    inputs:
-      run_mode:
-        description: 'Run Mode (normal/test)'
-        required: false
-        default: 'normal'
-        type: choice
-        options:
-        - normal
-        - test
-
-permissions:
-  contents: write
+    # 每天北京时间早上 8:00 运行 (UTC 0:00)
+    - cron: '0 0 * * *'
+  workflow_dispatch:  # 允许手动触发
 
 jobs:
-  run-monitor:
+  run_monitor:
     runs-on: ubuntu-latest
     
+    permissions:
+      contents: write  # 需要写权限来提交数据库更改
+      
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v3
+    - name: Checkout code
+      uses: actions/checkout@v4
       
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.10'
+        cache: 'pip'
         
-    - name: Install system dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y ffmpeg
-        # Create dummy cookie file if needed (empty) to avoid errors if code checks for existence
-        touch www.youtube.com_cookies.txt
-
-    - name: Install Python dependencies
+    - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-        
-    - name: Setup Config
-      run: |
-        if [ -f youtube_rss_config.sample.json ]; then
-          cp youtube_rss_config.sample.json youtube_rss_config.json
-        else
-          echo "Warning: youtube_rss_config.sample.json not found"
-        fi
+        pip install -r requirements.txt
+        # 确保安装 ffmpeg (yt-dlp 最好有它)
+        sudo apt-get update && sudo apt-get install -y ffmpeg
 
     - name: Run Monitor
       env:
-        DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        # 配置环境变量覆盖 config.json
+        # 注意：需要在 GitHub 仓库 Settings -> Secrets and variables -> Actions 中设置这些 Secrets
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        OPENAI_API_BASE: ${{ secrets.OPENAI_API_BASE }}
         DINGTALK_WEBHOOK: ${{ secrets.DINGTALK_WEBHOOK }}
         DINGTALK_SECRET: ${{ secrets.DINGTALK_SECRET }}
-        # Using secrets to populate config values
+        # 可选：如果需要 Cookies
+        YOUTUBE_COOKIES_FILE: ${{ secrets.YOUTUBE_COOKIES_FILE }}
       run: |
-        if [ "${{ github.event.inputs.run_mode }}" == "test" ]; then
-          echo "Running in TEST mode..."
-          python youtube_rss_monitor.py --test
-        else
-          echo "Running in NORMAL mode..."
-          python youtube_rss_monitor.py --once
-        fi
-      
-    - name: Commit and push database changes
+        python youtube_rss_monitor.py --once
+
+    - name: Commit and push DB changes
       run: |
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
-        # Force add the database file (it might be ignored or new)
-        # Note: Using youtube_rss.db as defined in default config
-        git add -f youtube_rss.db
-        # Check if there are changes
-        if git diff --staged --quiet; then
-          echo "No changes to commit"
-        else
-          git commit -m "Update database state [skip ci]"
-          git push
-        fi
+        git config --global user.name 'GitHub Action'
+        git config --global user.email 'action@github.com'
+        git add youtube_rss.db
+        # 只有当有变化时才提交
+        git diff --quiet && git diff --staged --quiet || (git commit -m "Update database state [skip ci]" && git push)

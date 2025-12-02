@@ -17,8 +17,7 @@
 ```
 .
 ├── youtube_rss_monitor.py    # 主程序入口
-├── youtube_rss_config.json   # 配置文件（需从 sample 复制）
-├── youtube_rss_config.sample.json # 配置文件模板
+├── youtube_rss_config.json   # 配置文件
 ├── requirements.txt          # 项目依赖
 ├── utils/                    # 核心功能模块
 │   ├── models.py             # 数据模型定义
@@ -46,10 +45,6 @@
    ```
 
 3. **配置**
-   复制示例配置文件并修改：
-   ```bash
-   cp youtube_rss_config.sample.json youtube_rss_config.json
-   ```
    修改 `youtube_rss_config.json` 文件：
    - 填入 DeepSeek 或 OpenAI 的 `api_key`。
    - 配置钉钉机器人的 `webhook_url`。
